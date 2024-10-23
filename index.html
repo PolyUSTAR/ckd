@@ -33,7 +33,7 @@
       text-align: center;
       font-size: 30px;
       font-weight: bold;
-      margin: 2em 0 2em 0;
+      margin: 0 0 2em 0;
     }
 
     .form-label {
@@ -44,6 +44,24 @@
 
     button {
       margin-top: 1em;
+    }
+
+    .logo-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 30px;
+      margin: 2em 0 2em 0;
+    }
+
+    @media (max-width: 600px) {
+      .logo-container {
+        flex-direction: column;
+      }
+    }
+
+    .logo {
+      height: 80px;
     }
 
     .card-content {
@@ -59,6 +77,14 @@
 </head>
 
 <body>
+  <div class="logo-container">
+    <a href="https://www.polyu.edu.hk/">
+      <img src="resource/polyu.png" alt="PolyU" class="logo">
+    </a>
+    <a href="https://www.polyu.edu.hk/hti/">
+      <img src="resource/hti.png" alt="HTI" class="logo">
+    </a>
+  </div>
   <div class="title">
     Smart-CKD: a novel diagnostic platform for assessing moderate-to-severe renal fibrosis in chronic kidney disease
   </div>
@@ -158,6 +184,12 @@
       plotPredictionGraph(history);
     };
 
+    // 保持工具栏常驻
+    const config = {
+      displayModeBar: true,  // 始终显示工具栏
+      displaylogo: false     // 隐藏 Plotly logo（可选）
+    };
+
     // 画图函数，使用 Plotly.js 绘制所有历史记录
     function plotPredictionGraph(predictions) {
       const traces = predictions.map((record, index) => {
@@ -188,7 +220,8 @@
           range: [0, 1],
           showline: true,
           linewidth: 1,
-          mirror: true
+          mirror: 'allticks',
+          linecolor: 'black',
         },
         yaxis: {
           title: '',
@@ -197,13 +230,14 @@
           showticklabels: false,  // 隐藏纵轴的刻度标签
           showline: true,
           linewidth: 1,
-          mirror: true
+          mirror: 'allticks',
+          linecolor: 'black',
         },
         margin: {
-          l: 50,
-          r: 50,
+          l: 10,
+          r: 10,
           b: 50,
-          t: 20 // 为工具栏与标题提供更多间距
+          t: 40 // 为工具栏与标题提供更多间距
         },
         showlegend: false,
         font: {
@@ -213,7 +247,7 @@
         }
       };
 
-      Plotly.newPlot('predictionGraph', traces, layout);
+      Plotly.newPlot('predictionGraph', traces, layout, config);
     }
 
     // 页面关闭前提示用户
@@ -232,7 +266,8 @@
           range: [0, 1],
           showline: true,
           linewidth: 1,
-          mirror: true
+          mirror: 'allticks',
+          linecolor: 'black',
         },
         yaxis: {
           title: '',
@@ -241,13 +276,14 @@
           showticklabels: false,
           showline: true,
           linewidth: 1,
-          mirror: true
+          mirror: 'allticks',
+          linecolor: 'black',
         },
         margin: {
-          l: 50,
-          r: 50,
+          l: 10,
+          r: 10,
           b: 50,
-          t: 20
+          t: 40
         },
         showlegend: false,
         font: {
@@ -256,7 +292,7 @@
           color: '#000'
         }
       };
-      Plotly.newPlot('predictionGraph', [], layout);
+      Plotly.newPlot('predictionGraph', [], layout, config);
     }
 
     // 页面加载时初始化空白图表
