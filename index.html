@@ -75,6 +75,7 @@
       /* Increased chart height */
     }
   </style>
+  <link rel="icon" href="resource/fav.png">
 </head>
 
 <body>
@@ -91,13 +92,13 @@
   </div>
   <div class="container">
     <div class="row d-flex flex-wrap">
-      <!-- 输入表单 -->
+      <!-- Input form -->
       <div class="col-lg-4 col-md-6 mb-3 d-flex">
         <div class="card-equal card-content w-100">
           <form id="predictForm">
             <div class="mb-3">
               <label for="age" class="form-label">Age</label>
-              <input type="number" id="age" class="form-control" value="50" min="0" max="120" step="any">
+              <input type="number" id="age" class="form-control" value="39.72" min="0" max="120" step="any">
             </div>
             <div class="mb-3">
               <label for="renalLength" class="form-label">Renal Length (cm)</label>
@@ -112,7 +113,7 @@
         </div>
       </div>
 
-      <!-- 结果展示 -->
+      <!-- Result display -->
       <div class="col-lg-8 col-md-6 mb-3 d-flex">
         <div class="card-equal card-content w-100">
           <label class="form-label">Prediction Results</label>
@@ -123,18 +124,7 @@
   </div>
 
   <script>
-    // 逻辑回归模型参数
-    const model_coeff = {
-      "(Intercept)": -5.123,
-      "Age": 0.05,
-      "Renal.length": 0.1,
-      "EDV": 0.03
-    };
-
-    // 存储历史预测记录的数组
-    let history = [];
-
-    // 随机颜色生成器
+    // Random color generator
     function getRandomColor() {
       const letters = '0123456789ABCDEF';
       let color = '#';
@@ -144,54 +134,131 @@
       return color;
     }
 
-    // 逻辑回归预测函数
+    /* Output from GLM in R:
+
+    Call:
+    glm(formula = Pathology ~ Age + Renal.length + EDV, family = binomial(link = "logit"), 
+        data = data)
+
+    Deviance Residuals: 
+        Min       1Q   Median       3Q      Max  
+    -2.0848  -0.8286   0.2811   0.8352   3.3969  
+
+    Coefficients:
+                Estimate Std. Error z value Pr(>|z|)    
+    (Intercept)   9.27977    3.14412   2.951  0.00316 ** 
+    Age           0.05944    0.01792   3.317  0.00091 ***
+    Renal.length -0.86893    0.28316  -3.069  0.00215 ** 
+    EDV          -0.22331    0.08356  -2.672  0.00753 ** 
+    ---
+    Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+    (Dispersion parameter for binomial family taken to be 1)
+
+        Null deviance: 157.72  on 113  degrees of freedom
+    Residual deviance: 118.79  on 110  degrees of freedom
+    AIC: 126.79
+
+    Number of Fisher Scoring iterations: 5
+
+    --------------------------------------------
+
+                 (Intercept)           Age Renal.length           EDV
+    (Intercept)    9.8854877 -2.854000e-04 -0.823280651 -1.125396e-01
+    Age           -0.0002854  3.211410e-04 -0.001252484  8.585865e-05
+    Renal.length  -0.8232807 -1.252484e-03  0.080177799  3.165479e-03
+    EDV           -0.1125396  8.585865e-05  0.003165479  6.982053e-03
+
+    */
+
+    // Model coefficients
+    const model_coeff = {
+      "(Intercept)": 9.27977,
+      "Age": 0.05944,
+      "Renal.length": -0.86893,
+      "EDV": -0.22331
+    };
+
+    // Variance and covariance values extracted from the R model
+    const variance_intercept = 3.14412 ** 2
+    const variance_age = 0.01792 ** 2
+    const variance_renal_length = 0.28316 ** 2
+    const variance_edv = 0.08356 ** 2
+
+    const covariance_intercept_age = -0.0002854;
+    const covariance_intercept_renal_length = -0.823280651;
+    const covariance_intercept_edv = -0.1125396;
+    const covariance_age_renal_length = -0.001252484;
+    const covariance_age_edv = 8.585865e-05;
+    const covariance_renal_length_edv = 0.003165479;
+
     function logistic_predict(age, renal_length, edv) {
-      let logit = model_coeff["(Intercept)"]
+      const A = model_coeff["(Intercept)"]
         + model_coeff["Age"] * age
         + model_coeff["Renal.length"] * renal_length
         + model_coeff["EDV"] * edv;
-      let odds = Math.exp(logit);
-      let probability = odds / (1 + odds);
 
-      // 计算95%置信区间，假设标准误为0.05，95% CI = ± 1.96 * SE
-      let SE = 0.05;
-      let lower_bound = Math.max(probability - 1.96 * SE, 0);
-      let upper_bound = Math.min(probability + 1.96 * SE, 1);
+      const probability = Math.exp(A) / (1 + Math.exp(A));
+
+      const SE = Math.sqrt(
+        variance_intercept +
+        variance_age * Math.pow(age, 2) +
+        variance_renal_length * Math.pow(renal_length, 2) +
+        variance_edv * Math.pow(edv, 2) +
+        2 * covariance_intercept_age * age +
+        2 * covariance_intercept_renal_length * renal_length +
+        2 * covariance_intercept_edv * edv +
+        2 * covariance_age_renal_length * age * renal_length +
+        2 * covariance_age_edv * age * edv +
+        2 * covariance_renal_length_edv * renal_length * edv
+      );
+
+      const logitLower = A - 1.96 * SE;
+      const logitUpper = A + 1.96 * SE;
+
+      const lower_bound = Math.exp(logitLower) / (1 + Math.exp(logitLower));
+      const upper_bound = Math.exp(logitUpper) / (1 + Math.exp(logitUpper));
 
       return { probability, lower_bound, upper_bound };
     }
 
-    // 处理表单提交
+    let history = [];
+
+    // Process the form submission
     document.getElementById("predictForm").onsubmit = function (event) {
       event.preventDefault();
       const age = parseFloat(document.getElementById("age").value);
       const renalLength = parseFloat(document.getElementById("renalLength").value);
       const edv = parseFloat(document.getElementById("edv").value);
 
-      // 获取预测概率和误差限
+      // Obtain the prediction probability and confidence interval
       const prediction = logistic_predict(age, renalLength, edv);
       const color = getRandomColor();
 
-      // 将新的预测结果添加到历史记录中
+      // Add the new prediction to the history
       history.push({
         age,
         renalLength,
         edv,
         ...prediction,
-        color // 为每个预测分配一个随机颜色
+        color // Add a random color for the plot
       });
 
-      // 更新图表，绘制所有历史记录
+      // Log last prediction to the console
+      console.log("Index\tAge\t\tRenal.length\tEDV\t\tPrediction\tLower.bound\tUpper.bound ");
+      console.log(`${history.length}\t\t${age.toFixed(2)}\t${renalLength.toFixed(3)}\t\t\t${edv.toFixed(3)}\t${prediction.probability.toFixed(3)}\t\t${prediction.lower_bound.toFixed(3)}\t\t${prediction.upper_bound.toFixed(3)}`);
+
+      // Update the plot
       plotPredictionGraph(history);
     };
 
-    // 保持工具栏常驻
+    // Keep the Plotly.js toolbar always visible
     const config = {
-      displayModeBar: true,  // 始终显示工具栏
-      displaylogo: false     // 隐藏 Plotly logo（可选）
+      displayModeBar: true,  // Always show the toolbar
+      displaylogo: false     // Hide the Plotly logo (optional)
     };
 
-    // 画图函数，使用 Plotly.js 绘制所有历史记录
+    // Plotting function using Plotly.js to plot all historical records
     function plotPredictionGraph(predictions) {
       const traces = predictions.map((record, index) => {
         return {
@@ -226,9 +293,9 @@
         },
         yaxis: {
           title: '',
-          range: [0, Math.max(3, predictions.length) + 1], // 默认显示3个记录
+          range: [0, Math.max(3, predictions.length) + 1], // Show 3 records by default
           autorange: false,
-          showticklabels: false,  // 隐藏纵轴的刻度标签
+          showticklabels: false,  // Hide the tick labels on the y-axis
           showline: true,
           linewidth: 1,
           mirror: 'allticks',
@@ -238,7 +305,7 @@
           l: 10,
           r: 10,
           b: 50,
-          t: 40 // 为工具栏与标题提供更多间距
+          t: 40 // Provide more space for the toolbar and title
         },
         showlegend: false,
         font: {
@@ -251,15 +318,15 @@
       Plotly.newPlot('predictionGraph', traces, layout, config);
     }
 
-    // 页面关闭前提示用户
+    // Prompt the user before leaving the page
     window.addEventListener('beforeunload', function (e) {
       if (history.length > 0) {
+        e.returnValue = 'Your history will be lost, are you sure you want to leave?'; // Custom message
         e.preventDefault();
-        e.returnValue = 'Your history will be lost, are you sure you want to leave?'; // 自定义提示信息
       }
     });
 
-    // 初始化空白坐标系
+    // Initialize the blank graph
     function initializeBlankGraph() {
       const layout = {
         xaxis: {
@@ -272,7 +339,7 @@
         },
         yaxis: {
           title: '',
-          range: [0, 3], // 默认显示3个空白记录
+          range: [0, 3], // Show 3 blank records by default
           autorange: false,
           showticklabels: false,
           showline: true,
@@ -296,7 +363,7 @@
       Plotly.newPlot('predictionGraph', [], layout, config);
     }
 
-    // 页面加载时初始化空白图表
+    // Show a blank graph when the page is loaded
     window.onload = function () {
       initializeBlankGraph();
     };
